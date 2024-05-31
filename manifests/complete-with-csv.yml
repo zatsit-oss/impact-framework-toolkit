@@ -1,0 +1,133 @@
+# ie --manifest complete-with-csv.yml --output test#energy
+name: mock-observation-demo
+description: example invoking mock-observation plugin
+tags:
+initialize:
+  outputs:
+   - yaml
+#   - csv
+  plugins:
+    group-by:
+      path: 'builtin'
+      method: GroupBy
+    cloud-metadata:
+      method: CloudMetadata
+      path: '@grnsft/if-plugins'
+    e-mem:
+      method: EMem
+      path: '@grnsft/if-plugins'
+    e-net:
+      method: ENet
+      path: '@grnsft/if-plugins'
+    sci-e:
+      method: SciE
+      path: '@grnsft/if-plugins'
+    teads-curve:
+      path: "@grnsft/if-unofficial-plugins"
+      method: TeadsCurve
+    ccf:
+      method: CloudCarbonFootprint
+      path: '@grnsft/if-unofficial-plugins'
+    grafana-exporter:
+      method: CsvExport
+      path: '@grnsft/if-plugins'
+
+    # regex:
+    #   method: Regex
+    #   path: '@grnsft/if-plugins'
+    #   global-config:
+    #     parameter: memory-available
+    #     match: ^1+
+    #     output: memory/capacity
+    mock-observations:
+      kind: plugin
+      method: MockObservations
+      path: '@grnsft/if-plugins'
+      global-config:
+        timestamp-from: 2023-07-06T00:00
+        timestamp-to: 2023-07-06T00:30
+        duration: 60
+        components:
+          - instance-type: A1
+          - instance-type: A2
+        generators:
+          common:
+            region: europe-west1
+            cloud/vendor: aws
+            # see https://github.com/Green-Software-Foundation/if-plugins/blob/main/src/lib/cloud-metadata/aws-instances.csv
+            cloud/instance-type: c1.medium
+            common-key: common-val
+          randint:
+            cpu/utilization:
+              min: 1
+              max: 99
+            memory/utilization:
+              min: 1
+              max: 99
+            network/data-in:
+              min: 0.2
+              max: 7
+            network/data-out:
+              min: 0.2
+              max: 3
+            memory/capacity:
+              min: 1
+              max: 32
+tree:
+  config:
+    group-by:
+      group:
+        - instance-type
+#    grafana-exporter:
+#      output-path: ./grafana-export2.csv
+#      headers:
+#        - instance-type
+#        - timestamp
+#        - duration
+#        - energy
+  children:
+    energy:
+      pipeline:
+        - mock-observations
+        - cloud-metadata
+#        - group-by
+        - teads-curve
+        - e-mem
+        - e-net
+        - sci-e
+        - grafana-exporter
+      config:
+        group-by:
+          group:
+            - instance-type
+        grafana-exporter:
+          output-path: ./grafana/grafana-data/grafana-export-energy.csv
+          headers:
+            - instance-type
+            - timestamp
+            - duration
+            - energy
+      inputs:
+    ccf:
+       pipeline:
+         - mock-observations
+         - cloud-metadata
+#         - group-by
+         - ccf
+         - grafana-exporter
+       config:
+         group-by:
+           group:
+             - instance-type
+         grafana-exporter:
+           output-path: ./grafana/grafana-data/grafana-export-ccf.csv
+           headers:
+             - instance-type
+             - timestamp
+             - duration
+             - energy
+       inputs:
+aggregation:
+   metrics:
+     - "energy"
+   type: "both"
